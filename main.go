@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
+	"go/scanner"
 	"go/token"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -19,10 +22,30 @@ func main() {
 	}
 
 	// Parse src but stop after processing the imports.
-	f, _ := parser.ParseFile(fset, "", src, parser.AllErrors)
+	f, err := parser.ParseFile(fset, "", src, parser.AllErrors)
 	if err != nil {
-		fmt.Println(err)
-		return
+		var errs scanner.ErrorList
+		if errors.As(err, &errs) {
+			bailout := false
+			defer func() {
+				if bailout {
+					for _, err := range []*scanner.Error(errs) {
+						fmt.Println(err)
+					}
+				}
+			}()
+
+			for _, err := range []*scanner.Error(errs) {
+				// sorta hacky, but seems like the only option for now
+				if !strings.Contains(err.Msg, "missing ',' before newline") {
+					bailout = true
+					return
+				}
+			}
+		} else {
+			fmt.Println(err)
+			return
+		}
 	}
 
 	added := []token.Position{}
@@ -56,7 +79,7 @@ func main() {
 		offset += 1
 	}
 
-	fmt.Println("-----------------------------------")
+	// fmt.Println("-----------------------------------")
 	fmt.Println(string(src))
 }
 

@@ -23,6 +23,11 @@ func main() {
 		2,
 		false
 	}
+
+	// weird edge cases: https://github.com/golang/go/issues/18939
+	_ = []int{1, 2
+		+3, 4}
+
 }
 
 func Foo(
@@ -32,5 +37,4 @@ func Foo(
 func(Struct) Bar(
 	int j
 ) {}
-
 
