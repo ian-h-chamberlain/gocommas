@@ -56,6 +56,14 @@ func FindMissingCommas(filename string, src []byte) (positions []token.Position,
 func filterCommaErrors(errs scanner.ErrorList) scanner.ErrorList {
 	var result scanner.ErrorList
 
+	// We may want to keep track of the comma errors for later, so we can exit
+	// with error if there was something we couldn't fix. Basically just ensure
+	// all the positions are accounted for.
+
+	// Hmm, actually I guess we could just use the errors directly to find
+	// positions, but it might be more robust to use the AST and just check our
+	// work using the errors. Let's keep trying it that way for now
+
 	for _, scanErr := range []*scanner.Error(errs) {
 		// sorta hacky, but seems like the best option for now
 		if !strings.Contains(scanErr.Msg, "missing ',' before newline") {
