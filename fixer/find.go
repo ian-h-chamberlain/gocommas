@@ -13,7 +13,7 @@ import (
 func FindMissingCommas(filename string, src []byte) (positions []token.Position, err error) {
 	fset := token.NewFileSet() // positions are relative to fset
 
-	f, err := parser.ParseFile(fset, filename, src, parser.AllErrors)
+	fileRoot, err := parser.ParseFile(fset, filename, src, parser.AllErrors)
 	if err != nil {
 		var scannerErrs scanner.ErrorList
 		if errors.As(err, &scannerErrs) {
@@ -26,34 +26,11 @@ func FindMissingCommas(filename string, src []byte) (positions []token.Position,
 		}
 	}
 
-	positions = []token.Position{}
+	finder := missingCommaFinder{Src: src, Fset: fset}
 
-	ast.Inspect(
-		f,
-		func(node ast.Node) bool {
-			switch node := node.(type) {
-			case *ast.CompositeLit:
-				positions = append(
-					positions,
-					getCompositeLitMissingCommas(src, fset, node)...,
-				)
-			case *ast.FuncDecl:
-				positions = append(
-					positions,
-					getFuncDeclMissingCommas(src, fset, node)...,
-				)
+	ast.Inspect(fileRoot, finder.VisitNode)
 
-			case *ast.CallExpr:
-				// TODO
-			}
-
-			// for now always descend to children. This might be optimizable later
-			// by bailing out for types that cannot have the children we care about
-			// (e.g. import statements, struct defs, etc)
-			return true
-		})
-
-	return positions, nil
+	return finder.Positions, nil
 }
 
 func filterCommaErrors(errs scanner.ErrorList) scanner.ErrorList {
@@ -78,7 +55,97 @@ func filterCommaErrors(errs scanner.ErrorList) scanner.ErrorList {
 
 }
 
-func findMissingCommaPos[Elem ast.Node](
+type missingCommaFinder struct {
+	Src       []byte
+	Fset      *token.FileSet
+	Positions []token.Position
+}
+
+func (f *missingCommaFinder) VisitNode(node ast.Node) bool {
+	switch node := node.(type) {
+	case *ast.FieldList:
+		f.Positions = append(f.Positions, f.findInFieldList(node)...)
+	case *ast.CompositeLit:
+		f.Positions = append(f.Positions, f.findInCompositeLit(node)...)
+	case *ast.FuncDecl:
+		// all child types of FuncDecl should be covered by FieldList
+	case *ast.CallExpr:
+		// TODO
+	}
+
+	// for now always descend to children. This might be optimizable later
+	// by bailing out for types that cannot have the children we care about
+	// (e.g. import statements, struct defs, etc)
+	return true
+
+}
+
+func (f *missingCommaFinder) findInCompositeLit(lit *ast.CompositeLit) []token.Position {
+	if pos, ok := findMissingComma(
+		f.Src,
+		f.Fset,
+		lit.Elts,
+		lit.Rbrace,
+	); ok {
+		return []token.Position{pos}
+	}
+
+	return nil
+}
+
+func (f *missingCommaFinder) findInFuncDecl(funcDecl *ast.FuncDecl) []token.Position {
+	positions := []token.Position{}
+
+	if funcDecl.Recv != nil {
+		if pos, ok := findMissingComma(
+			f.Src,
+			f.Fset,
+			funcDecl.Recv.List,
+			funcDecl.Recv.Closing,
+		); ok {
+			positions = append(positions, pos)
+		}
+	}
+
+	if funcDecl.Type != nil {
+		if pos, ok := findMissingComma(
+			f.Src,
+			f.Fset,
+			funcDecl.Type.Params.List,
+			funcDecl.Type.Params.Closing,
+		); ok {
+			positions = append(positions, pos)
+		}
+
+		if funcDecl.Type.Results != nil {
+			if pos, ok := findMissingComma(
+				f.Src,
+				f.Fset,
+				funcDecl.Type.Results.List,
+				funcDecl.Type.Results.Closing,
+			); ok {
+				positions = append(positions, pos)
+			}
+		}
+	}
+
+	return positions
+}
+
+func (f *missingCommaFinder) findInFieldList(fieldList *ast.FieldList) []token.Position {
+	if pos, ok := findMissingComma(
+		f.Src,
+		f.Fset,
+		fieldList.List,
+		fieldList.Closing,
+	); ok {
+		return []token.Position{pos}
+	}
+
+	return nil
+}
+
+func findMissingComma[Elem ast.Node](
 	input []byte,
 	fset *token.FileSet,
 	nodes []Elem,
@@ -110,64 +177,4 @@ func findMissingCommaPos[Elem ast.Node](
 	}
 
 	return token.Position{}, false
-}
-
-func getCompositeLitMissingCommas(
-	input []byte,
-	fset *token.FileSet,
-	lit *ast.CompositeLit,
-) []token.Position {
-	if pos, ok := findMissingCommaPos(
-		input,
-		fset,
-		lit.Elts,
-		lit.Rbrace,
-	); ok {
-		return []token.Position{pos}
-	}
-
-	return nil
-}
-
-func getFuncDeclMissingCommas(
-	input []byte,
-	fset *token.FileSet,
-	funcDecl *ast.FuncDecl,
-) []token.Position {
-	positions := []token.Position{}
-
-	if funcDecl.Recv != nil {
-		if pos, ok := findMissingCommaPos(
-			input,
-			fset,
-			funcDecl.Recv.List,
-			funcDecl.Recv.Closing,
-		); ok {
-			positions = append(positions, pos)
-		}
-	}
-
-	if funcDecl.Type != nil {
-		if pos, ok := findMissingCommaPos(
-			input,
-			fset,
-			funcDecl.Type.Params.List,
-			funcDecl.Type.Params.Closing,
-		); ok {
-			positions = append(positions, pos)
-		}
-
-		if funcDecl.Type.Results != nil {
-			if pos, ok := findMissingCommaPos(
-				input,
-				fset,
-				funcDecl.Type.Results.List,
-				funcDecl.Type.Results.Closing,
-			); ok {
-				positions = append(positions, pos)
-			}
-		}
-	}
-
-	return positions
 }

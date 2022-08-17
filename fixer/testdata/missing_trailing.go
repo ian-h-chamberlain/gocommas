@@ -42,6 +42,15 @@ func Foo(
 	bool
 ) {}
 
+func Baz[
+	X any,
+	Y any
+](
+	int i
+) (
+	bool
+) {}
+
 func(
 	Struct
 ) Bar(
