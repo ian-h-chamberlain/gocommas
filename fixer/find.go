@@ -33,12 +33,15 @@ func FindMissingCommas(filename string, src []byte) (positions []token.Position,
 		func(node ast.Node) bool {
 			switch node := node.(type) {
 			case *ast.CompositeLit:
-				pos, isMissing := isCompositeLitMissingComma(src, fset, node)
-				if isMissing {
-					positions = append(positions, pos)
-				}
+				positions = append(
+					positions,
+					getCompositeLitMissingCommas(src, fset, node)...,
+				)
 			case *ast.FuncDecl:
-				// TODO
+				positions = append(
+					positions,
+					getFuncDeclMissingCommas(src, fset, node)...,
+				)
 
 			case *ast.CallExpr:
 				// TODO
@@ -75,19 +78,20 @@ func filterCommaErrors(errs scanner.ErrorList) scanner.ErrorList {
 
 }
 
-func isCompositeLitMissingComma(
+func findMissingCommaPos[Elem ast.Node](
 	input []byte,
 	fset *token.FileSet,
-	lit *ast.CompositeLit,
+	nodes []Elem,
+	closing token.Pos,
 ) (token.Position, bool) {
-	if len(lit.Elts) == 0 {
+	if len(nodes) == 0 {
 		return token.Position{}, false
 	}
 
-	lastEl := lit.Elts[len(lit.Elts)-1]
+	lastEl := nodes[len(nodes)-1]
 
 	lastElPos := fset.Position(lastEl.End())
-	rbracePos := fset.Position(lit.Rbrace)
+	rbracePos := fset.Position(closing)
 
 	if rbracePos.Line <= lastElPos.Line {
 		// trailing comma not required if brace is on same line
@@ -106,4 +110,64 @@ func isCompositeLitMissingComma(
 	}
 
 	return token.Position{}, false
+}
+
+func getCompositeLitMissingCommas(
+	input []byte,
+	fset *token.FileSet,
+	lit *ast.CompositeLit,
+) []token.Position {
+	if pos, ok := findMissingCommaPos(
+		input,
+		fset,
+		lit.Elts,
+		lit.Rbrace,
+	); ok {
+		return []token.Position{pos}
+	}
+
+	return nil
+}
+
+func getFuncDeclMissingCommas(
+	input []byte,
+	fset *token.FileSet,
+	funcDecl *ast.FuncDecl,
+) []token.Position {
+	positions := []token.Position{}
+
+	if funcDecl.Recv != nil {
+		if pos, ok := findMissingCommaPos(
+			input,
+			fset,
+			funcDecl.Recv.List,
+			funcDecl.Recv.Closing,
+		); ok {
+			positions = append(positions, pos)
+		}
+	}
+
+	if funcDecl.Type != nil {
+		if pos, ok := findMissingCommaPos(
+			input,
+			fset,
+			funcDecl.Type.Params.List,
+			funcDecl.Type.Params.Closing,
+		); ok {
+			positions = append(positions, pos)
+		}
+
+		if funcDecl.Type.Results != nil {
+			if pos, ok := findMissingCommaPos(
+				input,
+				fset,
+				funcDecl.Type.Results.List,
+				funcDecl.Type.Results.Closing,
+			); ok {
+				positions = append(positions, pos)
+			}
+		}
+	}
+
+	return positions
 }

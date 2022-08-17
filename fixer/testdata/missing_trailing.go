@@ -38,9 +38,15 @@ func main() {
 
 func Foo(
 	int i
+) (
+	bool
 ) {}
 
-func(Struct) Bar(
+func(
+	Struct
+) Bar(
 	int j
+) (
+	bool
 ) {}
 
