@@ -31,13 +31,22 @@ func FindMissingCommas(filename string, src []byte) (positions []token.Position,
 	ast.Inspect(
 		f,
 		func(node ast.Node) bool {
-			switch node.(type) {
+			switch node := node.(type) {
 			case *ast.CompositeLit:
-				pos, isMissing := isMissingTrailingComma(src, fset, node.(*ast.CompositeLit))
+				pos, isMissing := isCompositeLitMissingComma(src, fset, node)
 				if isMissing {
 					positions = append(positions, pos)
 				}
+			case *ast.FuncDecl:
+				// TODO
+
+			case *ast.CallExpr:
+				// TODO
 			}
+
+			// for now always descend to children. This might be optimizable later
+			// by bailing out for types that cannot have the children we care about
+			// (e.g. import statements, struct defs, etc)
 			return true
 		})
 
@@ -58,8 +67,10 @@ func filterCommaErrors(errs scanner.ErrorList) scanner.ErrorList {
 
 }
 
-func isMissingTrailingComma(
-	input []byte, fset *token.FileSet, lit *ast.CompositeLit,
+func isCompositeLitMissingComma(
+	input []byte,
+	fset *token.FileSet,
+	lit *ast.CompositeLit,
 ) (token.Position, bool) {
 	if len(lit.Elts) == 0 {
 		return token.Position{}, false
