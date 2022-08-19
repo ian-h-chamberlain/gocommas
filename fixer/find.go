@@ -13,7 +13,13 @@ import (
 func FindMissingCommas(filename string, src []byte) (positions []token.Position, err error) {
 	fset := token.NewFileSet() // positions are relative to fset
 
-	fileRoot, err := parser.ParseFile(fset, filename, src, parser.AllErrors)
+	// TODO: we might be able to prtially support formatting "fragments" by
+	// using parser.ParseExprFrom(), possibly with some heuristic modifications
+	// like wrapping it in `func() {}` to support statements, and eventually falling back
+	// if nothing works. Alternatively, maybe a "selection mode" CLI option would
+	// work a little better than just trying everything every time.
+
+	fileRoot, err := parser.ParseFile(fset, filename, src, parser.AllErrors|parser.SkipObjectResolution)
 	if err != nil {
 		var scannerErrs scanner.ErrorList
 		if errors.As(err, &scannerErrs) {
