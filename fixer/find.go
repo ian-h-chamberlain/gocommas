@@ -72,7 +72,7 @@ func (f *missingCommaFinder) VisitNode(node ast.Node) bool {
 	case *ast.FieldList:
 		f.Positions = append(f.Positions, f.findInFieldList(node)...)
 
-	case *ast.StructType:
+	case *ast.StructType, *ast.InterfaceType:
 		// struct definitions contain a FieldList, but should be separated by
 		// newlines/semicolons, not commas, so don't traverse these
 		return false

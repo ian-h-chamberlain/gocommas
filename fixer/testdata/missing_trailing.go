@@ -5,6 +5,10 @@ type Struct struct {
 	k bool
 }
 
+type Intf interface {
+	DoSomething()
+}
+
 func main() {
 	x := []string{
 		"1",

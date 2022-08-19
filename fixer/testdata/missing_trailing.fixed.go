@@ -2,7 +2,11 @@ package foo
 
 type Struct struct {
 	i, j int
-	k    bool
+	k bool
+}
+
+type Intf interface {
+	DoSomething()
 }
 
 func main() {
@@ -23,14 +27,39 @@ func main() {
 		2,
 		false,
 	}
+
+	// weird edge cases: https://github.com/golang/go/issues/18939
+	_ = []int{1, 2
+		+3, 4}
+
+	foo(
+		1,
+		2,
+		3,
+	)
+
 }
 
 func Foo(
 	int i,
-) {
-}
+) (
+	bool,
+) {}
 
-func (Struct) Bar(
+func Baz[
+	X any,
+	Y any,
+](
+	int i,
+) (
+	bool,
+) {}
+
+func(
+	Struct,
+) Bar(
 	int j,
-) {
-}
+) (
+	bool,
+) {}
+
