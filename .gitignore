@@ -13,3 +13,8 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+# Main binary
+/gocommas
+# Testdata "results" files where actual output is saved
+*.actual.go

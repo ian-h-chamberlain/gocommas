@@ -65,10 +65,18 @@ func (f *missingCommaFinder) VisitNode(node ast.Node) bool {
 	switch node := node.(type) {
 	case *ast.FieldList:
 		f.Positions = append(f.Positions, f.findInFieldList(node)...)
+
+	case *ast.StructType:
+		// struct definitions contain a FieldList, but should be separated by
+		// newlines/semicolons, not commas, so don't traverse these
+		return false
+
 	case *ast.CompositeLit:
 		f.Positions = append(f.Positions, f.findInCompositeLit(node)...)
+
 	case *ast.FuncDecl:
 		// all child types of FuncDecl should be covered by FieldList
+
 	case *ast.CallExpr:
 		// TODO
 	}
