@@ -29,8 +29,8 @@ func main() {
 	}
 
 	// weird edge cases: https://github.com/golang/go/issues/18939
-	_ = []int{1, 2
-		+3, 4}
+	_ = []int{1, 2+
+		3, 4}
 
 	foo(
 		1,
@@ -38,6 +38,18 @@ func main() {
 		3
 	)
 
+	bar(
+		1,
+		2,
+		x...
+	)
+
+	func(a, b, c string) {
+	}(
+		"a",
+		"b",
+		"c"
+	)
 }
 
 func Foo(

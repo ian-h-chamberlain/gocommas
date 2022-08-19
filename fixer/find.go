@@ -69,27 +69,27 @@ type missingCommaFinder struct {
 
 func (f *missingCommaFinder) VisitNode(node ast.Node) bool {
 	switch node := node.(type) {
-	case *ast.FieldList:
-		f.Positions = append(f.Positions, f.findInFieldList(node)...)
-
 	case *ast.StructType, *ast.InterfaceType:
 		// struct definitions contain a FieldList, but should be separated by
-		// newlines/semicolons, not commas, so don't traverse these
+		// newlines/semicolons, not commas, so don't descend into these
 		return false
+
+	case *ast.FieldList:
+		f.Positions = append(f.Positions, f.findInFieldList(node)...)
 
 	case *ast.CompositeLit:
 		f.Positions = append(f.Positions, f.findInCompositeLit(node)...)
 
+	case *ast.CallExpr:
+		f.Positions = append(f.Positions, f.findInCallExpr(node)...)
+
 	case *ast.FuncDecl:
 		// all child types of FuncDecl should be covered by FieldList
-
-	case *ast.CallExpr:
-		// TODO
 	}
 
-	// for now always descend to children. This might be optimizable later
+	// For now always descend to children. This might be optimizable later
 	// by bailing out for types that cannot have the children we care about
-	// (e.g. import statements, struct defs, etc)
+	// (e.g. import blocks, etc)
 	return true
 
 }
@@ -107,43 +107,29 @@ func (f *missingCommaFinder) findInCompositeLit(lit *ast.CompositeLit) []token.P
 	return nil
 }
 
-func (f *missingCommaFinder) findInFuncDecl(funcDecl *ast.FuncDecl) []token.Position {
-	positions := []token.Position{}
-
-	if funcDecl.Recv != nil {
-		if pos, ok := findMissingComma(
-			f.Src,
-			f.Fset,
-			funcDecl.Recv.List,
-			funcDecl.Recv.Closing,
-		); ok {
-			positions = append(positions, pos)
-		}
+func (f *missingCommaFinder) findInCallExpr(callExpr *ast.CallExpr) []token.Position {
+	if callExpr.Ellipsis != token.NoPos {
+		// gofmt handles trailing ellipsis without any trouble, since a trailing
+		// comma is not required after an ellipsis. So if we see an ellipsis in
+		// the call expression, we don't try to fix anything.
+		return nil
 	}
 
-	if funcDecl.Type != nil {
-		if pos, ok := findMissingComma(
-			f.Src,
-			f.Fset,
-			funcDecl.Type.Params.List,
-			funcDecl.Type.Params.Closing,
-		); ok {
-			positions = append(positions, pos)
-		}
-
-		if funcDecl.Type.Results != nil {
-			if pos, ok := findMissingComma(
-				f.Src,
-				f.Fset,
-				funcDecl.Type.Results.List,
-				funcDecl.Type.Results.Closing,
-			); ok {
-				positions = append(positions, pos)
-			}
-		}
+	args := []ast.Node{}
+	for _, arg := range callExpr.Args {
+		args = append(args, arg)
 	}
 
-	return positions
+	if pos, ok := findMissingComma(
+		f.Src,
+		f.Fset,
+		args,
+		callExpr.Rparen,
+	); ok {
+		return []token.Position{pos}
+	}
+
+	return nil
 }
 
 func (f *missingCommaFinder) findInFieldList(fieldList *ast.FieldList) []token.Position {
